@@ -1,8 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>FreeDOS Test</title>
+</head>
+<body style="background:black; color:lime; font-family:monospace;">
+
+<h2>FreeDOS Boot Test</h2>
+<div id="screen"></div>
+
 <script src="https://copy.sh/v86/build/v86.js"></script>
 
 <script>
 new V86({
   wasm_path: "https://copy.sh/v86/build/v86.wasm",
+
+  memory_size: 32 * 1024 * 1024,
+  vga_memory_size: 8 * 1024 * 1024,
+
+  screen_container: document.getElementById("screen"),
 
   bios: { url: "https://copy.sh/v86/bios/seabios.bin" },
   vga_bios: { url: "https://copy.sh/v86/bios/vgabios.bin" },
@@ -12,29 +28,6 @@ new V86({
   autostart: true
 });
 </script>
-
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Sample Text Page</title>
-</head>
-<body>
-
-    <h1>This is a Main Heading</h1>
-    <p>This is a normal paragraph of text. You can use paragraphs to structure your main content.</p>
-    
-    <h2>This is a Sub-heading</h2>
-    <p>This paragraph contains some <b>bold text</b> and some <i>italic text</i>. It also includes a line break.<br>
-    The line break tag (`<br>`) does not require a closing tag.</p>
-
-    <h3>Text Formatting Examples</h3>
-    <ul>
-        <li><strong>Strong text</strong> (important and bold)</li>
-        <li><em>Emphasized text</em> (emphasized and italic)</li>
-        <li><mark>Marked or highlighted text</mark></li>
-        <li><del>Deleted text</del> <ins>inserted text</ins></li>
-        <li>Subscript text (H<sub>2</sub>O) and superscript text (e<sup>x</sup>)</li>
-    </ul>
 
 </body>
 </html>

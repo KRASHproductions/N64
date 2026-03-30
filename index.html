@@ -1,0 +1,14 @@
+<script src="https://copy.sh/v86/build/v86.js"></script>
+
+<script>
+new V86({
+  wasm_path: "https://copy.sh/v86/build/v86.wasm",
+
+  bios: { url: "https://copy.sh/v86/bios/seabios.bin" },
+  vga_bios: { url: "https://copy.sh/v86/bios/vgabios.bin" },
+
+  fda: { url: "freedos.img" },
+
+  autostart: true
+});
+</script>

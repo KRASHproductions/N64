@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>FreeDOS 772</title>
+  <style>
+    body {
+      background: #000;
+      color: #33ff33;
+      font-family: monospace;
+      margin: 0;
+      padding: 10px;
+    }
+
+    #screen-wrap {
+      position: relative;
+      width: 100%;
+      height: 400px;
+      background: #000;
+      overflow: hidden;
+      border: 1px solid #33ff33;
+    }
+
+    #screen {
+      position: absolute;
+    }
+
+    #screen canvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    #controls {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .row label {
+      width: 60px;
+    }
+
+    .row input[type=range] {
+      width: 300px;
+    }
+
+    .row .val {
+      width: 50px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="screen-wrap">
+  <div id="screen"></div>
+</div>
+
+<div id="controls">
+  <div class="row">
+    <label>X</label>
+    <input type="range" id="slX" min="-500" max="500" value="0">
+    <span class="val" id="valX">0</span>
+  </div>
+  <div class="row">
+    <label>Y</label>
+    <input type="range" id="slY" min="-500" max="500" value="0">
+    <span class="val" id="valY">0</span>
+  </div>
+  <div class="row">
+    <label>Width</label>
+    <input type="range" id="slW" min="100" max="1600" value="720">
+    <span class="val" id="valW">720</span>
+  </div>
+  <div class="row">
+    <label>Height</label>
+    <input type="range" id="slH" min="100" max="1200" value="400">
+    <span class="val" id="valH">400</span>
+  </div>
+</div>
+
+<script src="libv86.js"></script>
+<script>
+  const screen = document.getElementById('screen');
+
+  function applyLayout() {
+    const x = document.getElementById('slX').value;
+    const y = document.getElementById('slY').value;
+    const w = document.getElementById('slW').value;
+    const h = document.getElementById('slH').value;
+
+    screen.style.left   = x + 'px';
+    screen.style.top    = y + 'px';
+    screen.style.width  = w + 'px';
+    screen.style.height = h + 'px';
+
+    document.getElementById('valX').textContent = x;
+    document.getElementById('valY').textContent = y;
+    document.getElementById('valW').textContent = w;
+    document.getElementById('valH').textContent = h;
+
+    // resize the canvas inside if v86 already created it
+    const canvas = screen.querySelector('canvas');
+    if (canvas) {
+      canvas.style.width  = w + 'px';
+      canvas.style.height = h + 'px';
+    }
+  }
+
+  ['slX','slY','slW','slH'].forEach(id => {
+    document.getElementById(id).addEventListener('input', applyLayout);
+  });
+
+  applyLayout();
+
+  new V86({
+    wasm_path: "v86.wasm",
+    memory_size: 32 * 1024 * 1024,
+    vga_memory_size: 8 * 1024 * 1024,
+    screen_container: document.getElementById("screen"),
+    bios: { url: "seabios.bin" },
+    vga_bios: { url: "vgabios.bin" },
+    fda: { url: "freedos.img" },
+    autostart: true
+  });
+</script>
+</body>
+</html>

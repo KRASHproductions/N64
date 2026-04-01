@@ -1,0 +1,473 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>FreeDOS 772</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #008080;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #win {
+      position: relative;
+      width: min(820px, 98vw);
+      height: 100vh;
+    }
+
+    #chrome {
+      position: absolute;
+      inset: 0;
+      /* match device pixels exactly so canvas text is crisp */
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+      image-rendering: pixelated;
+    }
+
+    #screen {
+      position: absolute;
+      z-index: 1;
+      background: #000;
+    }
+
+    #screen canvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    /* ── INSTALL MENU ── */
+    #install-menu {
+      position: absolute;
+      z-index: 20;
+      pointer-events: all;
+      font-family: "Arial", sans-serif;
+      font-size: 11px;
+      color: #000;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .install-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #c0c0c0;
+      padding: 2px 6px;
+      border-top: 1px solid #fff;
+      border-left: 1px solid #fff;
+      border-right: 1px solid #808080;
+      border-bottom: 1px solid #808080;
+    }
+
+    .install-row span {
+      min-width: 80px;
+    }
+
+    .install-btn {
+      font-family: "Arial", sans-serif;
+      font-size: 11px;
+      background: #c0c0c0;
+      border-top: 1px solid #fff;
+      border-left: 1px solid #fff;
+      border-right: 1px solid #808080;
+      border-bottom: 1px solid #808080;
+      padding: 1px 8px;
+      cursor: pointer;
+    }
+
+    .install-btn:active {
+      border-top: 1px solid #808080;
+      border-left: 1px solid #808080;
+      border-right: 1px solid #fff;
+      border-bottom: 1px solid #fff;
+    }
+
+    .install-btn:disabled {
+      color: #808080;
+      cursor: default;
+    }
+
+    .install-status {
+      color: #000080;
+      min-width: 120px;
+    }
+
+    /* ── CONTROLS SECTION (add stuff here later) ── */
+    #controls {
+      position: absolute;
+      z-index: 20;
+      pointer-events: all;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+  </style>
+</head>
+<body>
+<div id="win">
+  <div id="screen"></div>
+  <canvas id="chrome"></canvas>
+  <div id="install-menu"></div>
+  <div id="controls">
+    <!-- controls go here -->
+  </div>
+</div>
+
+<script src="libv86.js"></script>
+<script>
+/* ─────────────────────────────────────────
+   WIN95 PIXEL CHROME PAINTER
+───────────────────────────────────────── */
+const WIN_BG   = '#c0c0c0';
+const WHITE    = '#ffffff';
+const LTGRAY   = '#dfdfdf';
+const DKGRAY   = '#808080';
+const BLACK    = '#000000';
+const TITLE_L  = '#000080';
+const TITLE_R  = '#1084d0';
+const TITLE_TXT = '#ffffff';
+
+let screenRect = null;
+let menuRect   = null;
+
+function drawWin95(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.width;
+  const H   = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  ctx.imageSmoothingEnabled = false;
+
+  /* scale all drawing by dpr so 1 logical px = 1 physical px */
+  ctx.save();
+  ctx.scale(dpr, dpr);
+
+  const LW = canvas.width  / dpr;  /* logical width  */
+  const LH = canvas.height / dpr;  /* logical height */
+
+  const TITLE_H   = 18;
+  const TOOLBAR_H = 22;
+  const BORDER    = 2;
+  const INNER     = 2;
+  const PADDING   = 10;
+
+  /* outer raised border */
+  ctx.fillStyle = BLACK;
+  ctx.fillRect(0, 0, LW, LH);
+  ctx.fillStyle = WHITE;
+  ctx.fillRect(1, 1, LW - 2, LH - 2);
+  ctx.fillStyle = DKGRAY;
+  ctx.fillRect(BORDER, BORDER, LW - BORDER*2, LH - BORDER*2);
+  ctx.fillStyle = WIN_BG;
+  ctx.fillRect(BORDER+1, BORDER+1, LW-(BORDER+1)*2, LH-(BORDER+1)*2);
+  ctx.fillStyle = WHITE;
+  ctx.fillRect(BORDER, BORDER, LW - BORDER*2, 1);
+  ctx.fillRect(BORDER, BORDER, 1, LH - BORDER*2);
+
+  /* title bar */
+  const TB_X = BORDER + 2;
+  const TB_Y = BORDER + 2;
+  const TB_W = LW - (BORDER+2)*2;
+
+  ctx.fillStyle = TITLE_L;
+  ctx.fillRect(TB_X, TB_Y, Math.floor(TB_W * 0.55), TITLE_H);
+  ctx.fillStyle = TITLE_R;
+  ctx.fillRect(TB_X + Math.floor(TB_W * 0.55), TB_Y, TB_W - Math.floor(TB_W * 0.55), TITLE_H);
+
+  /* title icon */
+  ctx.fillStyle = BLACK;
+  ctx.fillRect(TB_X+2, TB_Y+1, 14, 14);
+  ctx.fillStyle = '#00cc00';
+  ctx.font = 'bold 7px monospace';
+  ctx.fillText('C:', TB_X+3, TB_Y+9);
+  ctx.fillStyle = WHITE;
+  ctx.fillText('\\', TB_X+3, TB_Y+14);
+
+  /* title text */
+  ctx.fillStyle = TITLE_TXT;
+  ctx.font = 'bold 11px Arial';
+  ctx.fillText('MS-DOS Prompt', TB_X+20, TB_Y+13);
+
+  /* window buttons */
+  const BTN_W = 14, BTN_H = 12, BTN_Y = TB_Y+2;
+  const bx = [
+    TB_X + TB_W - (BTN_W+2)*3,
+    TB_X + TB_W - (BTN_W+2)*2,
+    TB_X + TB_W - (BTN_W+2),
+  ];
+  bx.forEach((x, i) => {
+    ctx.fillStyle = WIN_BG;
+    ctx.fillRect(x, BTN_Y, BTN_W, BTN_H);
+    ctx.fillStyle = WHITE;
+    ctx.fillRect(x, BTN_Y, BTN_W, 1);
+    ctx.fillRect(x, BTN_Y, 1, BTN_H);
+    ctx.fillStyle = DKGRAY;
+    ctx.fillRect(x+BTN_W-1, BTN_Y, 1, BTN_H);
+    ctx.fillRect(x, BTN_Y+BTN_H-1, BTN_W, 1);
+    ctx.fillStyle = BLACK;
+    ctx.fillRect(x+BTN_W, BTN_Y+1, 1, BTN_H);
+    ctx.fillRect(x+1, BTN_Y+BTN_H, BTN_W, 1);
+    ctx.fillStyle = BLACK;
+    if (i === 0) {
+      ctx.fillRect(x+3, BTN_Y+BTN_H-4, 7, 1);
+    } else if (i === 1) {
+      ctx.strokeStyle = BLACK; ctx.lineWidth = 1;
+      ctx.strokeRect(x+3, BTN_Y+2, 7, 7);
+      ctx.fillRect(x+3, BTN_Y+2, 7, 1);
+      ctx.fillRect(x+3, BTN_Y+3, 7, 1);
+    } else {
+      ctx.lineWidth = 1.5; ctx.strokeStyle = BLACK;
+      ctx.beginPath();
+      ctx.moveTo(x+3, BTN_Y+2); ctx.lineTo(x+BTN_W-3, BTN_Y+BTN_H-3);
+      ctx.moveTo(x+BTN_W-3, BTN_Y+2); ctx.lineTo(x+3, BTN_Y+BTN_H-3);
+      ctx.stroke();
+    }
+  });
+
+  /* toolbar */
+  const TBR_Y = TB_Y + TITLE_H + 1;
+  ctx.fillStyle = WIN_BG;
+  ctx.fillRect(TB_X, TBR_Y, TB_W, TOOLBAR_H);
+  ctx.fillStyle = DKGRAY;
+  ctx.fillRect(TB_X, TBR_Y+TOOLBAR_H-1, TB_W, 1);
+
+  /* Auto dropdown */
+  const DD_X=TB_X+2, DD_Y=TBR_Y+2, DD_W=50, DD_H=TOOLBAR_H-5;
+  ctx.fillStyle = WHITE; ctx.fillRect(DD_X, DD_Y, DD_W, DD_H);
+  ctx.fillStyle = DKGRAY;
+  ctx.fillRect(DD_X, DD_Y, 1, DD_H);
+  ctx.fillRect(DD_X, DD_Y, DD_W, 1);
+  ctx.fillStyle = WHITE;
+  ctx.fillRect(DD_X+DD_W, DD_Y, 1, DD_H);
+  ctx.fillRect(DD_X, DD_Y+DD_H, DD_W+1, 1);
+  ctx.fillStyle = BLACK;
+  ctx.font = '10px Arial'; ctx.fillText('Auto', DD_X+3, DD_Y+11);
+  ctx.beginPath();
+  ctx.moveTo(DD_X+DD_W-9, DD_Y+5);
+  ctx.lineTo(DD_X+DD_W-4, DD_Y+5);
+  ctx.lineTo(DD_X+DD_W-6, DD_Y+9);
+  ctx.fill();
+
+  /* separator */
+  const SEP_X = DD_X+DD_W+5;
+  ctx.fillStyle = DKGRAY; ctx.fillRect(SEP_X, TBR_Y+2, 1, TOOLBAR_H-5);
+  ctx.fillStyle = WHITE;  ctx.fillRect(SEP_X+1, TBR_Y+2, 1, TOOLBAR_H-5);
+
+  /* toolbar icon buttons */
+  let ix = SEP_X+6;
+  ['⚙','⧉','⧉','⛶','A'].forEach((ic, idx) => {
+    const IB = 18;
+    ctx.fillStyle = WIN_BG; ctx.fillRect(ix, TBR_Y+2, IB, IB-2);
+    ctx.fillStyle = WHITE;
+    ctx.fillRect(ix, TBR_Y+2, IB, 1);
+    ctx.fillRect(ix, TBR_Y+2, 1, IB-2);
+    ctx.fillStyle = DKGRAY;
+    ctx.fillRect(ix+IB-1, TBR_Y+2, 1, IB-2);
+    ctx.fillRect(ix, TBR_Y+IB-1, IB, 1);
+    ctx.fillStyle = BLACK;
+    ctx.font = idx===4 ? 'bold 11px serif' : '10px sans-serif';
+    ctx.fillText(ic, ix+4, TBR_Y+14);
+    ix += IB+2;
+  });
+
+  /* sunken screen inset */
+  const SC_X = TB_X + PADDING;
+  const SC_Y = TBR_Y + TOOLBAR_H + PADDING;
+  const SC_W = TB_W - PADDING*2;
+
+  /* reserve bottom for install menu: roughly 2 rows * 22px + padding */
+  const MENU_H = 56;
+  const SC_H = LH - SC_Y - PADDING - BORDER - 2 - MENU_H;
+
+  ctx.clearRect(SC_X+INNER, SC_Y+INNER, SC_W-INNER*2, SC_H-INNER*2);
+
+  ctx.fillStyle = DKGRAY;
+  ctx.fillRect(SC_X, SC_Y, SC_W, 1);
+  ctx.fillRect(SC_X, SC_Y, 1, SC_H);
+  ctx.fillStyle = WHITE;
+  ctx.fillRect(SC_X+SC_W-1, SC_Y, 1, SC_H);
+  ctx.fillRect(SC_X, SC_Y+SC_H-1, SC_W, 1);
+  ctx.fillStyle = BLACK;
+  ctx.fillRect(SC_X+1, SC_Y+1, SC_W-2, 1);
+  ctx.fillRect(SC_X+1, SC_Y+1, 1, SC_H-2);
+  ctx.fillStyle = LTGRAY;
+  ctx.fillRect(SC_X+SC_W-2, SC_Y+1, 1, SC_H-2);
+  ctx.fillRect(SC_X+1, SC_Y+SC_H-2, SC_W-2, 1);
+
+  ctx.restore();
+
+  /* store logical rects for positioning DOM elements */
+  screenRect = { x: SC_X+INNER, y: SC_Y+INNER, w: SC_W-INNER*2, h: SC_H-INNER*2 };
+  menuRect   = { x: SC_X, y: SC_Y+SC_H+PADDING, w: SC_W };
+}
+
+function applyLayout() {
+  if (!screenRect) return;
+  const scr = document.getElementById('screen');
+  scr.style.left   = screenRect.x + 'px';
+  scr.style.top    = screenRect.y + 'px';
+  scr.style.width  = screenRect.w + 'px';
+  scr.style.height = screenRect.h + 'px';
+  const cv = scr.querySelector('canvas');
+  if (cv) { cv.style.width = screenRect.w+'px'; cv.style.height = screenRect.h+'px'; }
+
+  const menu = document.getElementById('install-menu');
+  menu.style.left  = menuRect.x + 'px';
+  menu.style.top   = menuRect.y + 'px';
+  menu.style.width = menuRect.w + 'px';
+}
+
+function resize() {
+  const win    = document.getElementById('win');
+  const canvas = document.getElementById('chrome');
+  const dpr    = window.devicePixelRatio || 1;
+  canvas.width  = win.offsetWidth  * dpr;
+  canvas.height = win.offsetHeight * dpr;
+  canvas.style.width  = win.offsetWidth  + 'px';
+  canvas.style.height = win.offsetHeight + 'px';
+  drawWin95(canvas);
+  applyLayout();
+}
+
+window.addEventListener('resize', resize);
+
+/* ─────────────────────────────────────────
+   GAMES / INSTALL SYSTEM
+───────────────────────────────────────── */
+const GAMES = [
+  {
+    name: 'Doom (1993)',
+    zip:  'doom19s.zip',
+    dest: 'C:\\DOOM',
+    run:  'C:\\DOOM\\INSTALL.BAT',
+  },
+  {
+    name: 'Dune II (1992)',
+    zip:  'Dune-II-The-Building-of-a-Dynasty_DOS_EN.zip',
+    dest: 'C:\\DUNE2',
+    run:  'C:\\DUNE2\\DUNE2.EXE',
+  },
+];
+
+let emulator = null;
+
+function buildInstallMenu() {
+  const menu = document.getElementById('install-menu');
+  menu.innerHTML = '';
+  GAMES.forEach((game, idx) => {
+    const row = document.createElement('div');
+    row.className = 'install-row';
+    row.innerHTML = `
+      <span>${game.name}</span>
+      <button class="install-btn" id="btn-${idx}">Install</button>
+      <span class="install-status" id="status-${idx}"></span>
+    `;
+    menu.appendChild(row);
+
+    document.getElementById(`btn-${idx}`).addEventListener('click', () => {
+      installGame(game, idx);
+    });
+  });
+}
+
+async function installGame(game, idx) {
+  const btn    = document.getElementById(`btn-${idx}`);
+  const status = document.getElementById(`status-${idx}`);
+
+  if (!emulator) {
+    status.textContent = 'Emulator not ready.';
+    return;
+  }
+
+  btn.disabled = true;
+  status.textContent = 'Downloading...';
+
+  try {
+    /* fetch the zip */
+    const resp = await fetch(game.zip);
+    if (!resp.ok) throw new Error('Download failed: ' + resp.status);
+    const buf = await resp.arrayBuffer();
+
+    status.textContent = 'Unpacking...';
+
+    /* unzip using fflate loaded from CDN */
+    await loadFflate();
+    const files = await unzipAll(buf);
+
+    status.textContent = 'Installing...';
+
+    /* write each file into the v86 filesystem */
+    for (const [relPath, bytes] of Object.entries(files)) {
+      /* build DOS path: dest + \ + filename */
+      const dosPath = (game.dest + '\\' + relPath).replace(/\//g, '\\');
+      await emulator.create_file(dosPath, bytes);
+    }
+
+    status.textContent = `Done! Type: ${game.run}`;
+    btn.textContent = 'Reinstall';
+    btn.disabled = false;
+
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+    btn.disabled = false;
+  }
+}
+
+/* lazy-load fflate (zip library) from CDN */
+let fflateLoaded = false;
+function loadFflate() {
+  if (fflateLoaded) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js';
+    s.onload  = () => { fflateLoaded = true; res(); };
+    s.onerror = () => rej(new Error('Failed to load fflate'));
+    document.head.appendChild(s);
+  });
+}
+
+function unzipAll(arrayBuffer) {
+  return new Promise((res, rej) => {
+    fflate.unzip(new Uint8Array(arrayBuffer), (err, data) => {
+      if (err) return rej(err);
+      /* filter out directory entries (empty files ending in /) */
+      const out = {};
+      for (const [path, bytes] of Object.entries(data)) {
+        if (bytes.length > 0) out[path] = bytes;
+      }
+      res(out);
+    });
+  });
+}
+
+/* ─────────────────────────────────────────
+   BOOT
+───────────────────────────────────────── */
+buildInstallMenu();
+resize();
+
+if (typeof V86 !== 'undefined') {
+  emulator = new V86({
+    wasm_path: "v86.wasm",
+    memory_size: 32 * 1024 * 1024,
+    vga_memory_size: 8 * 1024 * 1024,
+    screen_container: document.getElementById("screen"),
+    bios: { url: "seabios.bin" },
+    vga_bios: { url: "vgabios.bin" },
+    fda: { url: "freedos.img" },
+    autostart: true
+  });
+  setTimeout(resize, 500);
+}
+</script>
+</body>
+</html>

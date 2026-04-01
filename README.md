@@ -1,2 +1,2 @@
-# N64
-N64 emulator
+# FREEDOS
+DOS emulator
